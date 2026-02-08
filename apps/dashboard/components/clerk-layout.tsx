@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
@@ -16,6 +16,7 @@ import {
   User,
   CreditCard,
   Building2,
+  FolderKanban,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -26,6 +27,12 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+
+interface Project {
+  id: string;
+  name: string;
+  slug: string;
+}
 
 interface ClerkLayoutProps {
   children: React.ReactNode;
@@ -41,9 +48,34 @@ export function ClerkLayout({ children, developer }: ClerkLayoutProps) {
   const pathname = usePathname();
   const router = useRouter();
   const [instance, setInstance] = useState("Development");
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [selectedProject, setSelectedProject] = useState<Project | null>(null);
+  const [loadingProjects, setLoadingProjects] = useState(true);
+
+  useEffect(() => {
+    fetchProjects();
+  }, []);
+
+  const fetchProjects = async () => {
+    try {
+      const res = await fetch("/api/projects");
+      if (res.ok) {
+        const data = await res.json();
+        setProjects(data.projects || []);
+        if (data.projects && data.projects.length > 0) {
+          setSelectedProject(data.projects[0]);
+        }
+      }
+    } catch (err) {
+      console.error("Failed to fetch projects:", err);
+    } finally {
+      setLoadingProjects(false);
+    }
+  };
 
   const navigation = [
     { name: "Overview", href: "/dashboard", icon: LayoutDashboard },
+    { name: "Projects", href: "/dashboard/projects", icon: FolderKanban },
     { name: "Users", href: "/dashboard/users", icon: Users },
     {
       name: "Organizations",
@@ -79,23 +111,47 @@ export function ClerkLayout({ children, developer }: ClerkLayoutProps) {
             {/* Project Selector */}
             <DropdownMenu>
               <DropdownMenuTrigger className="flex items-center gap-2 rounded-lg border border-gray-800 bg-gray-900/50 px-3 py-1.5 text-sm hover:border-gray-700 transition">
-                <span className="text-gray-300">e3crethox</span>
+                <span className="text-gray-300">
+                  {selectedProject ? selectedProject.name : "Select Project"}
+                </span>
                 <ChevronDown className="h-4 w-4 text-gray-500" />
               </DropdownMenuTrigger>
               <DropdownMenuContent
                 align="start"
                 className="w-56 bg-gray-900 border-gray-800"
               >
-                <DropdownMenuItem className="focus:bg-gray-800">
-                  <div className="flex items-center gap-2">
-                    <div className="h-6 w-6 rounded bg-gradient-to-br from-purple-500 to-blue-500" />
-                    <span>e3crethox</span>
+                {projects.length > 0 ? (
+                  <>
+                    {projects.map((project) => (
+                      <DropdownMenuItem
+                        key={project.id}
+                        onClick={() => {
+                          setSelectedProject(project);
+                          router.push(`/dashboard/projects/${project.id}`);
+                        }}
+                        className="focus:bg-gray-800 cursor-pointer"
+                      >
+                        <div className="flex items-center gap-2">
+                          <div className="h-6 w-6 rounded bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center text-xs font-bold">
+                            {project.name.charAt(0).toUpperCase()}
+                          </div>
+                          <span>{project.name}</span>
+                        </div>
+                      </DropdownMenuItem>
+                    ))}
+                    <DropdownMenuSeparator className="bg-gray-800" />
+                  </>
+                ) : (
+                  <div className="px-3 py-2 text-sm text-gray-400">
+                    No projects yet
                   </div>
-                </DropdownMenuItem>
-                <DropdownMenuSeparator className="bg-gray-800" />
-                <DropdownMenuItem className="focus:bg-gray-800">
+                )}
+                <DropdownMenuItem
+                  onClick={() => router.push("/dashboard/projects/new")}
+                  className="focus:bg-gray-800 cursor-pointer"
+                >
                   <Plus className="mr-2 h-4 w-4" />
-                  Create application
+                  Create project
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
